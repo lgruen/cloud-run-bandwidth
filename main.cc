@@ -1,4 +1,5 @@
 #include <atomic>
+#include <chrono>
 #include <fstream>
 #include <future>
 #include <iostream>
@@ -10,6 +11,12 @@
 #include "cpp-httplib/httplib.h"
 
 namespace {
+
+size_t MillisSinceEpoch() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::system_clock::now().time_since_epoch())
+      .count();
+}
 
 void WorkerThread(const std::vector<std::string>& urls,
                   const std::string& access_token, std::vector<size_t>* sizes,
@@ -25,6 +32,7 @@ void WorkerThread(const std::vector<std::string>& urls,
       return;  // All done.
     }
     const std::string& url = urls[index];
+    const size_t start_ms = MillisSinceEpoch();
     const auto res = client.Get(url.c_str(), headers);
     if (!res) {
       std::cerr << "failed to fetch " << url << ": " << res.error()
@@ -36,6 +44,9 @@ void WorkerThread(const std::vector<std::string>& urls,
       std::cerr << "status for " << url << ": " << res->status << std::endl;
       continue;
     }
+
+    std::cout << url << ": " << start_ms << ".." << MillisSinceEpoch()
+              << " (ms since epoch)" << std::endl;
 
     (*sizes)[index] = res->body.size();
   }
@@ -72,7 +83,8 @@ int main(int argc, char** argv) {
         nlohmann::json::parse(access_token_res->body);
     const auto access_token = access_token_json["access_token"];
 
-    std::cout << "starting workers for request processing" << std::endl;
+    std::cout << "starting workers for request processing (ms since epoch: "
+              << MillisSinceEpoch() << ")" << std::endl;
     std::vector<size_t> sizes(urls.size());
     constexpr size_t kNumWorkers = 50;
     std::vector<std::thread> threads;
@@ -83,9 +95,14 @@ int main(int argc, char** argv) {
           [&] { WorkerThread(urls, access_token, &sizes, &shared_counter); }));
     }
 
+    std::cout << "waiting for threads to join (ms since epoch: "
+              << MillisSinceEpoch() << ")" << std::endl;
     for (auto& thread : threads) {
       thread.join();
     }
+
+    std::cout << "finished request processing (ms since epoch: "
+              << MillisSinceEpoch() << ")" << std::endl;
 
     size_t sum = 0;
     for (size_t size : sizes) {
