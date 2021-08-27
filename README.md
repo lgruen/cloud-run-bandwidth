@@ -33,7 +33,7 @@ In another terminal, run:
 /usr/bin/time -v curl localhost:8080
 ```
 
-The reported time should be about 12s.
+The reported time should be about 5s.
 
 ## Cloud Run
 

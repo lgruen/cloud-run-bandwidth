@@ -45,8 +45,9 @@ void WorkerThread(const std::vector<std::string>& urls,
       continue;
     }
 
-    std::cout << url << ": " << start_ms << ".." << MillisSinceEpoch()
-              << " (ms since epoch)" << std::endl;
+    const size_t stop_ms = MillisSinceEpoch();
+    std::cout << url << ": " << (stop_ms - start_ms) << " ms (" << start_ms
+              << ".." << stop_ms << " ms since epoch)" << std::endl;
 
     (*sizes)[index] = res->body.size();
   }
@@ -83,8 +84,9 @@ int main(int argc, char** argv) {
         nlohmann::json::parse(access_token_res->body);
     const auto access_token = access_token_json["access_token"];
 
+    const size_t start_ms = MillisSinceEpoch();
     std::cout << "starting workers for request processing (ms since epoch: "
-              << MillisSinceEpoch() << ")" << std::endl;
+              << start_ms << ")" << std::endl;
     std::vector<size_t> sizes(urls.size());
     constexpr size_t kNumWorkers = 50;
     std::vector<std::thread> threads;
@@ -101,8 +103,10 @@ int main(int argc, char** argv) {
       thread.join();
     }
 
-    std::cout << "finished request processing (ms since epoch: "
-              << MillisSinceEpoch() << ")" << std::endl;
+    const size_t stop_ms = MillisSinceEpoch();
+    std::cout << "finished request processing: " << (stop_ms - start_ms)
+              << " ms  (" << start_ms << ".." << stop_ms << " ms since epoch)"
+              << std::endl;
 
     size_t sum = 0;
     for (size_t size : sizes) {
