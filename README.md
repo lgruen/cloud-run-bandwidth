@@ -30,7 +30,7 @@ docker run --init -it -p 8080:8080 cloud-run-bandwidth
 In another terminal, run:
 
 ```bash
-time -v curl localhost:8080
+time curl localhost:8080
 ```
 
 The reported time should be about 4.5s.
