@@ -30,10 +30,10 @@ docker run --init -it -p 8080:8080 cloud-run-bandwidth
 In another terminal, run:
 
 ```bash
-/usr/bin/time -v curl localhost:8080
+time -v curl localhost:8080
 ```
 
-The reported time should be about 5s.
+The reported time should be about 4.5s.
 
 ## Cloud Run
 
@@ -53,7 +53,7 @@ IDENTITY_TOKEN=$(gcloud auth print-identity-token)
 time curl -H "Authorization: Bearer $IDENTITY_TOKEN" $CLOUD_RUN_URL
 ```
 
-In contrast, this will take longer than a minute, typically about 100s.
+In contrast, this will take longer than a minute, typically about 65s. A number of reads will also fail.
 
-Detailed timings, including for each GCS download, are visible in the
+Detailed timings and HTTP status results for each GCS download are visible in the
 [Cloud Run logs](https://console.cloud.google.com/run/detail/australia-southeast1/cloud-run-bandwidth/logs).
