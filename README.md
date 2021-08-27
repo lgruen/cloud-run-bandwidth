@@ -24,7 +24,7 @@ docker build --tag cloud-run-bandwidth .
 Using `screen` or similar, run in one terminal:
 
 ```bash
-docker run -p 8080:8080 cloud-run-bandwidth
+docker run --init -it -p 8080:8080 cloud-run-bandwidth
 ```
 
 In another terminal, run:
@@ -57,34 +57,3 @@ In contrast, this will take longer than a minute, typically about 100s.
 
 Detailed timings, including for each GCS download, are visible in the
 [Cloud Run logs](https://console.cloud.google.com/run/detail/australia-southeast1/cloud-run-bandwidth/logs).
-
-## Timings for GCE
-
-Total:
-
-```text
-parallel: 00:53:52.087251878..00:55:02.922513815
-...
-```
-
-Downloads:
-
-```text
-...
-https://storage.googleapis.com/leo-tmp-au/seqr/v4/original_sanitized_columns.parquet/part-00000-6a861cd0-5be1-4fdf-9c5e-88b7981ca6a9-c000.zstd.parquet: 00:53:54.571236971..00:53:55.453197859
-...
-```
-
-## Timings for Cloud Run
-
-Total:
-
-```text
-...
-```
-
-Downloads:
-
-```text
-...
-```

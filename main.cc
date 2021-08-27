@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
 
     const size_t stop_ms = MillisSinceEpoch();
     std::cout << "finished request processing: " << (stop_ms - start_ms)
-              << " ms  (" << start_ms << ".." << stop_ms << " ms since epoch)"
+              << " ms (" << start_ms << ".." << stop_ms << " ms since epoch)"
               << std::endl;
 
     size_t sum = 0;
