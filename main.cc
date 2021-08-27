@@ -1,4 +1,3 @@
-#include <atomic>
 #include <chrono>
 #include <fstream>
 #include <future>
@@ -9,6 +8,7 @@
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "cpp-httplib/httplib.h"
+#include "threadpool/ThreadPool.h"
 
 namespace {
 
@@ -18,39 +18,29 @@ size_t MillisSinceEpoch() {
       .count();
 }
 
-void WorkerThread(const std::vector<std::string>& urls,
-                  const std::string& access_token, std::vector<size_t>* sizes,
-                  std::atomic<size_t>* shared_counter) {
+// Downloads the given blob and returns its size in bytes.
+size_t DownloadBlob(const std::string& access_token, const std::string& url) {
   const httplib::Headers headers = {
       {"Authorization", std::string("Bearer ") + access_token}};
 
   httplib::Client client("https://storage.googleapis.com");
-
-  while (true) {
-    const size_t index = (*shared_counter)++;
-    if (index >= urls.size()) {
-      return;  // All done.
-    }
-    const std::string& url = urls[index];
-    const size_t start_ms = MillisSinceEpoch();
-    const auto res = client.Get(url.c_str(), headers);
-    if (!res) {
-      std::cerr << "failed to fetch " << url << ": " << res.error()
-                << std::endl;
-      continue;
-    }
-
-    if (res->status != 200) {
-      std::cerr << "status for " << url << ": " << res->status << std::endl;
-      continue;
-    }
-
-    const size_t stop_ms = MillisSinceEpoch();
-    std::cout << url << ": " << (stop_ms - start_ms) << " ms (" << start_ms
-              << ".." << stop_ms << " ms since epoch)" << std::endl;
-
-    (*sizes)[index] = res->body.size();
+  const size_t start_ms = MillisSinceEpoch();
+  const auto res = client.Get(url.c_str(), headers);
+  if (!res) {
+    std::cerr << "failed to fetch " << url << ": " << res.error() << std::endl;
+    return 0;
   }
+
+  if (res->status != 200) {
+    std::cerr << "status for " << url << ": " << res->status << std::endl;
+    return 0;
+  }
+
+  const size_t stop_ms = MillisSinceEpoch();
+  std::cout << url << ": " << (stop_ms - start_ms) << " ms (" << start_ms
+            << ".." << stop_ms << " ms since epoch)" << std::endl;
+
+  return res->body.size();
 }
 
 }  // namespace
@@ -65,9 +55,15 @@ int main(int argc, char** argv) {
 
   std::cout << "read " << urls.size() << " URLs" << std::endl;
 
+  constexpr size_t kNumWorkers = 50;
+  ThreadPool thread_pool(kNumWorkers);
+
   httplib::Server server;
 
-  server.Get("/", [&urls](const httplib::Request&, httplib::Response& res) {
+  server.Get("/", [&urls, &thread_pool](const httplib::Request&,
+                                        httplib::Response& res) {
+    const size_t start_ms = MillisSinceEpoch();
+
     std::cout << "fetching access token" << std::endl;
     httplib::Client client("http://metadata.google.internal");
     const httplib::Headers headers = {{"Metadata-Flavor", "Google"}};
@@ -84,37 +80,24 @@ int main(int argc, char** argv) {
         nlohmann::json::parse(access_token_res->body);
     const auto access_token = access_token_json["access_token"];
 
-    const size_t start_ms = MillisSinceEpoch();
-    std::cout << "starting workers for request processing (ms since epoch: "
-              << start_ms << ")" << std::endl;
-    std::vector<size_t> sizes(urls.size());
-    constexpr size_t kNumWorkers = 50;
-    std::vector<std::thread> threads;
-    threads.reserve(kNumWorkers);
-    std::atomic<size_t> shared_counter(0);
-    for (size_t i = 0; i < kNumWorkers; ++i) {
-      threads.push_back(std::thread(
-          [&] { WorkerThread(urls, access_token, &sizes, &shared_counter); }));
+    std::vector<std::future<size_t>> futures;
+    futures.reserve(urls.size());
+    for (const std::string& url : urls) {
+      futures.push_back(thread_pool.enqueue(DownloadBlob, access_token, url));
     }
 
-    std::cout << "waiting for threads to join (ms since epoch: "
-              << MillisSinceEpoch() << ")" << std::endl;
-    for (auto& thread : threads) {
-      thread.join();
+    size_t sum = 0;
+    for (auto& future : futures) {
+      sum += future.get();
     }
+
+    res.set_content(std::string("total bytes: ") + std::to_string(sum),
+                    "text/plain");
 
     const size_t stop_ms = MillisSinceEpoch();
     std::cout << "finished request processing: " << (stop_ms - start_ms)
               << " ms (" << start_ms << ".." << stop_ms << " ms since epoch)"
               << std::endl;
-
-    size_t sum = 0;
-    for (size_t size : sizes) {
-      sum += size;
-    }
-
-    res.set_content(std::string("total bytes: ") + std::to_string(sum),
-                    "text/plain");
   });
 
   server.listen("0.0.0.0", 8080);

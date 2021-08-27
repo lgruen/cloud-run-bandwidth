@@ -6,6 +6,7 @@ WORKDIR /app
 
 COPY main.cc blobs.txt ./
 COPY cpp-httplib/httplib.h cpp-httplib/httplib.h 
+COPY threadpool/ThreadPool.h threadpool/ThreadPool.h
 
 RUN g++ -Wall -Werror -std=c++17 -O3 -o main main.cc -lssl -lcrypto -lpthread
 
